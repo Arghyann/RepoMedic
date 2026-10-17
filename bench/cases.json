@@ -1,0 +1,58 @@
+[
+  {
+    "id": "pagination-off-by-one",
+    "title": "Product listing skips the first page",
+    "issue": "GET /products?page=1 never shows the first 10 products. Customers see products 11-20 on page 1, and the last products are unreachable.",
+    "target_tests": ["tests/test_catalog.py::test_first_page_starts_at_first_product", "tests/test_catalog.py::test_last_page_is_partial"],
+    "category": "logic",
+    "difficulty": "easy"
+  },
+  {
+    "id": "sql-injection-search",
+    "title": "Product search is SQL-injectable and breaks on apostrophes",
+    "issue": "Searching for O'Brien crashes the search endpoint with a SQL error, and a pentester reports that searching for ' OR '1'='1 dumps the whole products table.",
+    "target_tests": ["tests/test_catalog.py::test_search_is_not_injectable", "tests/test_catalog.py::test_search_handles_quotes"],
+    "category": "security",
+    "difficulty": "easy"
+  },
+  {
+    "id": "mutable-default-cart",
+    "title": "Customers see other customers' cart items",
+    "issue": "When a new customer adds their first item, their cart already contains items another customer added earlier. Carts appear to be shared between sessions.",
+    "target_tests": ["tests/test_cart.py::test_new_carts_do_not_share_items"],
+    "category": "logic",
+    "difficulty": "medium"
+  },
+  {
+    "id": "naive-datetime-coupon",
+    "title": "Checkout with any coupon crashes with TypeError",
+    "issue": "Applying coupon WELCOME10 at checkout raises TypeError: can't compare offset-naive and offset-aware datetimes. Every coupon is broken in production.",
+    "target_tests": ["tests/test_coupons.py::test_valid_coupon_applies_discount"],
+    "category": "reliability",
+    "difficulty": "easy"
+  },
+  {
+    "id": "idor-cancel-order",
+    "title": "Any user can cancel anyone else's order",
+    "issue": "Security report: user Bob was able to cancel Alice's order by calling the cancel endpoint with her order id. Only the order owner or an admin should be allowed to cancel; others must get PermissionDenied.",
+    "target_tests": ["tests/test_orders.py::test_other_user_cannot_cancel_order"],
+    "category": "security",
+    "difficulty": "medium"
+  },
+  {
+    "id": "oversell-stock",
+    "title": "Inventory goes negative",
+    "issue": "We sold 6 units of a product that only had 5 in stock; stock is now -1. Reserving more stock than available should raise OutOfStock and leave stock unchanged.",
+    "target_tests": ["tests/test_catalog.py::test_reserve_stock_rejects_oversell"],
+    "category": "logic",
+    "difficulty": "easy"
+  },
+  {
+    "id": "missing-404",
+    "title": "Unknown product returns HTTP 200",
+    "issue": "GET /products/999 for a product that does not exist returns status 200 with an error body. Clients and caches treat it as success. It should return 404.",
+    "target_tests": ["tests/test_api.py::test_missing_product_returns_404"],
+    "category": "api-contract",
+    "difficulty": "easy"
+  }
+]
