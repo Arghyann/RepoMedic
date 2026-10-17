@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "repomedic": {
+      "command": "C:\\Users\\prane\\OneDrive\\Desktop\\repomedic\\.venv\\Scripts\\repomedic-mcp.exe",
+      "args": ["--root", "C:\\path\\to\\your\\backend-repo"]
+    }
+  }
+}
