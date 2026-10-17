@@ -1,295 +1,160 @@
 # 🩺 RepoMedic
 
-**A local-first AI code doctor that finds bugs in backend repositories, proposes fixes, validates them against tests, and commits verified changes to a separate Git branch.**
+**A code doctor that runs on your own laptop. It finds bugs in a backend repository, writes the fix, proves the fix with your tests, and commits it to a separate branch.**
+It runs on **Google Gemma 4** through **Ollama**, and it reaches the repository through **MCP** tools.
 
-RepoMedic aims to combine **local language models, deterministic code analysis, and test-driven verification** to help developers debug backend applications without sending their source code to cloud-based AI services.
+> Your code never leaves your machine. There are no API keys and no cloud calls.
 
-The system is planned to use **Google Gemma through Ollama** for local inference and the **Model Context Protocol (MCP)** to expose repository inspection, testing, editing, and Git operations as reusable tools.
+```
+repomedic fix ./my-api --issue "GET /products?page=1 skips the first 10 products"
 
-> **Our goal:** Build a code-repair agent that does not just suggest a fix, but attempts to demonstrate that the fix works.
+  Scout          🔧 git_status · run_tests        🧪 baseline: 9 failed, 13 passed
+  Diagnostician  💭 "Pages are 1-indexed but offset = page * page_size…"
+                 🎯 shop/services/catalog.py · list_products
+  Surgeon        🩹 -    offset = page * page_size
+                    +    offset = (page - 1) * page_size
+  Verifier       🧪 attempt 1: 7 failed, 15 passed  → 2 tests fixed, 0 regressions
+                 ✔ committed on repomedic/product-listing-skips-the-first-page
+```
 
-## 🎯 Project Vision
+## Why it's different
 
-Debugging backend repositories often requires developers to trace execution paths, identify logic errors, understand existing tests, implement patches, and verify that changes do not introduce regressions.
+| | Typical "AI code review" | **RepoMedic** |
+|---|---|---|
+| Where it runs | Sends your code to a cloud LLM | **Local Gemma on Ollama.** Works offline, so it's safe for private or regulated code |
+| How it finds bugs | The LLM reads files and guesses | **Neuro-symbolic.** 18 deterministic AST and architecture detectors produce leads, Gemma judges each one in context, and a Gemma agent hunts for logic bugs using failing tests as evidence |
+| Fixes | Suggestions you have to trust | **Verified fixes.** Patch, run tests, and on any regression revert and retry with the test output as feedback, then commit to a new branch |
+| Tools | Hard-wired into one app | **An MCP server with 18 tools.** The same tools work in Claude Desktop, VS Code, Cursor or any other MCP client |
+| Evidence | Demo screenshots | **RepoMedic-Bench**, an eval in the style of SWE-bench, the agent gets only the issue text, and ground-truth tests it is never told about decide pass or fail |
 
-RepoMedic aims to automate this workflow through a controlled, locally executed agent pipeline.
-
-The proposed system will:
-
-- Analyze a repository using deterministic static and architectural checks.
-- Use a local Gemma model to investigate suspicious code and reason about potential bugs.
-- Generate targeted patches based on the issue description and available test evidence.
-- Run tests to evaluate the proposed changes.
-- Revert unsuccessful patches and use test failures to guide subsequent attempts.
-- Commit successful fixes to a separate Git branch, leaving the original branch untouched.
-
-The project will prioritize local execution, reproducibility, and evidence-backed code modifications.
-
-## ✨ Proposed Features
-
-| Feature | Planned functionality |
-|---|---|
-| Local inference | Run Gemma through Ollama without requiring external LLM API calls. |
-| Deterministic analysis | Develop AST-based detectors for common coding errors and architectural issues. |
-| Context-aware diagnosis | Use repository structure, code search, and test output to investigate potential bugs. |
-| Automated patching | Generate targeted source-code edits with syntax and safety checks. |
-| Test-driven verification | Run tests before and after changes to identify fixes and regressions. |
-| Retry and recovery | Revert unsuccessful patches and retry using previous errors as feedback. |
-| Git isolation | Create a dedicated branch for proposed fixes and commit only after verification. |
-| MCP integration | Expose repository operations through an MCP server for compatible development clients. |
-| Interactive interface | Build a web interface for viewing agent progress, diagnostics, patches, and test results. |
-| Benchmarking | Evaluate repair success against known bugs and independent test suites. |
-
-## 🏗️ Proposed Architecture
-
-The architecture will be organized around four cooperating stages.
+## Architecture
 
 ```mermaid
-flowchart TD
-    A[Issue Description + Repository] --> B[Scout]
-    B --> C[Diagnostician]
-    C --> D[Surgeon]
-    D --> E[Verifier]
-    E -->|Tests pass, no regressions| F[Review and Git Commit]
-    E -->|Failure or regression| G[Revert and Collect Feedback]
-    G --> D
-    B -.-> H[RepoMedic MCP Server]
-    C -.-> H
-    D -.-> H
-    E -.-> H
-    H --> I[Repository Tools]
-    I --> J[Git Operations]
-    I --> K[Static Analysis]
-    I --> L[Test Execution]
-    I --> M[File Inspection and Editing]
+flowchart LR
+  subgraph Agents["Agents (Gemma 4 via Ollama)"]
+    S[Scout<br/>map · scan · baseline tests] --> D[Diagnostician<br/>triage leads · hunt bugs · localize]
+    D --> U[Surgeon<br/>search/replace patch]
+    U --> V[Verifier<br/>run tests · diff failing sets]
+    V -- regression / no progress<br/>revert + feedback --> U
+    V -- verified --> G[(git branch + commit)]
+  end
+  Agents <-- "MCP (stdio)" --> M[RepoMedic MCP server]
+  M --> T1[repo_overview · list_files · read_file · search_code]
+  M --> T2[scan_code · analyze_architecture]
+  M --> T3[git_status · git_diff · git_log · git_blame · branch · switch · commit]
+  M --> T4[run_tests · apply_edit · revert_file]
+  C[Claude Desktop / VS Code / Cursor] <-- MCP --> M
 ```
 
-### 1. Scout — Repository Reconnaissance
+**How it uses Gemma**
+- **Native function calling with Gemma 4.** The model gets the MCP tool schemas as Ollama tool definitions.
+- **Automatic fallback to grammar-constrained JSON.** If a model doesn't produce tool calls (for example Gemma 3, which has no native tool support), the same agent loop switches to Ollama structured outputs mid-run. Any Gemma model works.
+- **Built for small models.** RepoMedic narrows the search by keywords and failing tests before Gemma reads any code. It shows Gemma the tests that must pass, and it keeps the context small by truncating old tool output. Edits are search/replace, matched with indentation tolerance and syntax-checked before they are written, so a 4B model can make the right change.
+- **Optional thinking mode** (`REPOMEDIC_THINK=1`). Gemma's reasoning streams into the UI timeline.
 
-The Scout will establish the repository's initial state and gather relevant evidence.
+**Safety**
+- Every path is sandboxed to the repository root, and `.git` is off-limits.
+- Python edits are compiled before they are written.
+- Fixes go on a new branch, and the tool refuses to run on a dirty working tree.
+- `--sandbox` works on a disposable copy.
+- Tests run with a timeout.
 
-Planned responsibilities:
-- Inspect repository structure and source files.
-- Check Git status and ensure the working tree satisfies the safety requirements.
-- Run baseline tests and record existing failures.
-- Identify relevant modules and potential code hotspots.
+## Quickstart
 
-### 2. Diagnostician — Bug Investigation
+```powershell
+# 1. Install Ollama (https://ollama.com), then:
+ollama pull gemma4:e4b                 # laptop-friendly. gemma4:26b is better quality; gemma4:31b-cloud if your machine is weak
 
-The Diagnostician will combine deterministic analysis with local model reasoning.
+# 2. Install RepoMedic
+powershell -ExecutionPolicy Bypass -File scripts\setup.ps1     # or: bash scripts/setup.sh
 
-Planned responsibilities:
-- Run static and architectural detectors.
-- Rank potential findings based on the issue description and available evidence.
-- Examine relevant functions and call paths.
-- Use test failures and assertion messages to narrow down the likely cause.
-- Produce a diagnosis identifying the suspected location and root cause.
+# 3. Use it
+.\.venv\Scripts\repomedic scan bench\buggy_shop                # static + architecture scan, no LLM needed
+.\.venv\Scripts\repomedic diagnose bench\buggy_shop            # Gemma triage + bug hunt -> reports/*.md
+.\.venv\Scripts\repomedic fix bench\buggy_shop --sandbox --issue "Applying coupon WELCOME10 raises TypeError"
+.\.venv\Scripts\repomedic serve                                # live web UI -> http://127.0.0.1:8765
+.\.venv\Scripts\repomedic bench                                # RepoMedic-Bench
+```
 
-### 3. Surgeon — Patch Generation
+### Use the MCP server from any client
 
-The Surgeon will attempt to implement the smallest reasonable correction.
+```jsonc
+// Claude Desktop: claude_desktop_config.json (see examples/)
+{ "mcpServers": { "repomedic": { "command": "<repo>/.venv/Scripts/repomedic-mcp.exe", "args": ["--root", "C:/path/to/repo"] } } }
+```
+The server also ships two MCP prompts, `diagnose_repository` and `fix_issue`.
 
-Planned responsibilities:
-- Generate targeted edits or function-level replacements.
-- Apply changes through repository tools.
-- Validate edits for syntax and structural correctness.
-- Preserve unrelated functionality and minimize the scope of modifications.
+## RepoMedic-Bench
 
-### 4. Verifier — Test-Driven Validation
+`bench/buggy_shop` is a small e-commerce backend with **7 realistic seeded bugs** of the kind real backends ship:
 
-The Verifier will evaluate whether a proposed fix behaves as intended.
-
-Planned responsibilities:
-- Run relevant tests after applying a patch.
-- Compare post-patch failures against the baseline.
-- Detect newly introduced regressions.
-- Feed failure details back into the repair loop.
-- Revert unsuccessful attempts and retry within a configurable limit.
-- Permit a commit only when the configured verification criteria are satisfied.
-
-Passing tests will be treated as evidence of correctness, not a guarantee that every possible bug has been eliminated.
-
-## 🧠 Planned Technology Stack
-
-| Component | Proposed technology |
-|---|---|
-| Local language model | Google Gemma |
-| Inference runtime | Ollama |
-| Agent orchestration | Python |
-| Repository integration | Model Context Protocol (MCP) |
-| Static analysis | Python AST and custom deterministic detectors |
-| Backend and API | FastAPI |
-| Interactive updates | Server-Sent Events (SSE) |
-| Version control | Git |
-| Testing | Pytest and repository-specific test suites |
-| Benchmarking | Custom benchmark harness with hidden judging tests |
-
-The final implementation may evolve as we evaluate model compatibility, performance, and resource requirements.
-
-## 🔐 Privacy and Safety by Design
-
-RepoMedic is being designed around local execution and controlled repository access.
-
-Planned safeguards include:
-
-- **Local inference:** Use a locally running Ollama model without external LLM API calls in the default workflow.
-- **Repository boundaries:** Restrict file access and modifications to the selected repository root.
-- **Protected Git metadata:** Prevent ordinary file-editing tools from accessing `.git` internals.
-- **Clean working tree checks:** Refuse automated repair when pre-existing uncommitted changes could be affected.
-- **Branch isolation:** Keep repair attempts separate from the user's original branch.
-- **Sandbox mode:** Support testing against a disposable repository copy.
-- **Syntax validation:** Check generated edits before writing them where applicable.
-- **Bounded execution:** Apply timeouts and limits to test runs and repair attempts.
-- **Verification before commit:** Require the configured checks to pass before creating an automated commit.
-
-Local execution reduces exposure to external services, but it does not eliminate risks from malicious repositories, unsafe tests, or incorrectly generated patches. Additional execution isolation and permission controls will be considered as part of implementation.
-
-## 🧪 Planned Evaluation: RepoMedic-Bench
-
-A central project goal is to measure whether RepoMedic can repair realistic bugs rather than merely generate plausible explanations.
-
-We plan to develop **RepoMedic-Bench**, a reproducible benchmark containing deliberately faulty backend repositories and independent judging tests.
-
-### Initial benchmark: Buggy Shop
-
-The proposed e-commerce backend benchmark will cover seven bug categories:
-
-| Case | Category | Intended defect |
+| Case | Category | Bug |
 |---|---|---|
-| Pagination off-by-one | Logic | Incorrect offset for one-indexed pages |
-| SQL injection search | Security | Unsafe construction of SQL search queries |
-| Mutable default cart | Logic | Shared mutable state between requests |
-| Naive datetime coupon | Reliability | Incompatible timezone-aware and naive datetime values |
-| IDOR order cancellation | Security | Missing ownership or administrator authorization checks |
-| Overselling stock | Logic | Missing inventory availability validation |
-| Missing 404 response | API contract | Returning success for a nonexistent resource |
+| pagination-off-by-one | logic | `offset = page * size` with 1-indexed pages |
+| sql-injection-search | security | f-string SQL in `LIKE` search |
+| mutable-default-cart | logic | `items=[]` default shares carts across users |
+| naive-datetime-coupon | reliability | naive `datetime.now()` vs aware expiry, causing a TypeError |
+| idor-cancel-order | security | missing ownership/admin check (IDOR) |
+| oversell-stock | logic | stock reserved without an availability check |
+| missing-404 | api-contract | not-found returns HTTP 200 |
 
-### Held-out benchmark: Buggy Bookings
+For each case the harness copies the repo, runs `git init`, and gives the agent **only the issue text**. The case passes only if its **ground-truth tests** pass afterwards. `--attempts 1` runs the ablation without the verify-and-retry loop.
 
-To evaluate generalization beyond the initial examples, we plan a second benchmark based on an event-ticket booking backend.
-
-It will investigate three additional defect types:
-
-- Case-insensitive email uniqueness violations.
-- Seat reservations remaining active after a payment failure.
-- Incorrect date comparisons caused by storing dates as `DD/MM/YYYY` strings.
-
-The held-out suite is intended to test the model's ability to reason about bugs that cannot be identified by the initial set of deterministic detectors.
-
-### Evaluation methodology
-
-The benchmark harness is planned to:
-
-1. Create an isolated copy of each faulty repository.
-2. Initialize a clean Git environment.
-3. Provide the agent with the issue description rather than the reference patch.
-4. Run independent judging tests after the repair attempt.
-5. Record successful repairs, regressions, execution time, and failure reasons.
-6. Compare alternative agent configurations, including repair retries and different tool-calling modes.
-
-Reference patches will be kept separate from the agent's inputs. We will also test whether those patches repair the intended failures without introducing unrelated regressions.
-
-### Target evaluation metrics
-
-- **Repair success rate:** Percentage of benchmark cases passing the judging tests.
-- **Regression rate:** Frequency of new failures introduced by attempted repairs.
-- **False success rate:** Frequency of reporting a fix as successful when the verification criteria have not been met.
-- **Average repair time:** Time required to diagnose, patch, and validate a case.
-- **Resource usage:** Model latency, token consumption where available, and system resource requirements.
-- **Generalization:** Performance on bugs outside the initial development benchmark.
-
-No benchmark performance is claimed at this stage. Results will be published after implementation and repeatable evaluation.
-
-## 🖥️ Planned User Experience
-
-The intended CLI workflow will look similar to the following:
-
-```text
-repomedic scan ./my-api
-
-repomedic diagnose ./my-api
-
-repomedic fix ./my-api \
-  --issue "GET /products?page=1 skips the first 10 products" \
-  --sandbox
-
-repomedic serve
+```powershell
+repomedic bench --model gemma4:e4b
+repomedic bench --model gemma4:e4b --attempts 1      # ablation
+repomedic bench --model gemma4:e4b --tool-mode json  # constrained-JSON mode
 ```
 
-The exact command syntax and available options will depend on the final implementation.
+**Results** (`gemma4:e4b`, CPU-only on a 16 GB laptop, fully offline):
 
-The intended repair timeline will show:
+| Agent version | Resolved | False claims | Avg time / bug |
+|---|---|---|---|
+| v1: search/replace edits, failing tests only | 3/7 (43%) | 0 | 225s |
+| **v2: function-level rewrites + guard tests + error-driven retries** | **7/7 (100%)** | **0** | **205s** |
 
-```text
-[Scout]          Inspecting repository and baseline tests
-[Diagnostician]  Investigating the suspected pagination bug
-[Surgeon]        Preparing a candidate patch
-[Verifier]       Running tests and checking regressions
-[Verifier]       Retry required — analyzing test failures
-[Git]            Preparing a verified fix on a separate branch
+The model, the bugs and the judging tests were the same in both runs; only the agent design changed:
+1. **Function-level edits.** Gemma rewrites the whole function, and RepoMedic swaps it in by AST. Two of the cart bug's three v1 attempts never applied because the search text didn't exactly match the file.
+2. **Guard tests.** Gemma sees every test that calls the function, including ones that pass today. In v1 the SQL fix kept dropping the `%` wildcards and breaking substring search, and the IDOR fix had no way to know admins may cancel.
+3. **Error-driven retries.** Retries get the previous diff, the source of the tests that broke, and the assertion lines, at a higher temperature.
+4. **CPU-friendly context.** The Surgeon gets the function plus an outline of the rest of the file (70% fewer tokens).
+
+Every v2 patch is the idiomatic fix: parameterized `LIKE ?` with `%term%` bound, `items=None`, `datetime.now(timezone.utc)`, an owner-or-admin check, a stock check before decrementing, and `404`. Raw results are in `bench/results/`.
+
+_Caveat: 7 cases is a small benchmark, and the bugs were seeded by us. Treat it as evidence that the loop works, not as a leaderboard number._
+
+### Held-out suite (overfitting check)
+Because v2 was developed against the main 7 cases, we froze the agent design and then wrote a **held-out suite**. It's a different backend, `bench/buggy_bookings` (event-ticket booking), with **3 new bug types**:
+- case-insensitive email duplicates;
+- a declined payment that still holds seats (ordering / consistency);
+- dates stored as `DD/MM/YYYY` text, so they're compared and sorted as text.
+
+A static scan of it finds **0 findings**. These are pure logic bugs, so the suite tests the model's reasoning, not our detectors.
+
+```powershell
+repomedic bench --suite heldout      # or --suite all for all 10 cases
 ```
 
-This timeline represents the intended user experience, not a report of completed execution.
+**Benchmark integrity:** `bench/gold_patches.py` has a reference fix for every case (never shown to the agent). `tests/test_bench_cases.py` proves, for all 10 cases, that the bug breaks the judging tests and the reference fix repairs exactly those tests without breaking anything else.
 
-## 🗺️ Development Roadmap
+## Project layout
 
-<text color="secondary" size="sm">Proposed phases — milestones will be marked complete only after implementation and testing.</text>
+```
+repomedic/
+  mcp_server/   server.py (18 MCP tools + 2 prompts) · analyzers.py · architecture.py · editing.py · testing.py · sandbox.py · gitops.py
+  agent/        llm.py (Ollama: tools + structured output) · toolbox.py (MCP client) · agents.py (tool loop) · orchestrator.py · prompts.py
+  web/          app.py (FastAPI + SSE) · static/index.html
+  cli.py · benchmark.py · report.py · workspace.py
+bench/          buggy_shop/ + cases.json (main) · buggy_bookings/ + heldout_cases.json (held-out) · gold_patches.py
+tests/          analyzers, editing/sandbox, symbols, full fix pipeline over real MCP stdio with a scripted LLM, benchmark integrity
+```
 
-### Phase 1 — Repository Analysis
-- [ ] Establish the Python project structure and CLI.
-- [ ] Implement repository inspection and Git-state checks.
-- [ ] Develop initial AST-based bug detectors.
-- [ ] Add architecture analysis and diagnostic reports.
+## Roadmap
+- Tree-sitter analyzers for JS/TS, Go and Java (the MCP tools themselves are already language-agnostic)
+- The Surgeon writes a regression test for every fix
+- A GitHub Action / PR bot mode using the same MCP server
+- Fine-tune a small Gemma on RepoMedic's own verified fix trajectories
 
-### Phase 2 — MCP Server
-- [ ] Implement repository-reading and code-search tools.
-- [ ] Add static analysis, testing, and Git-operation tools.
-- [ ] Implement safe editing and recovery operations.
-- [ ] Test MCP communication through stdio.
 
-### Phase 3 — Local Agent Pipeline
-- [ ] Integrate Gemma through Ollama.
-- [ ] Implement the Scout, Diagnostician, Surgeon, and Verifier stages.
-- [ ] Support native tool calling where available and structured-output fallback where appropriate.
-- [ ] Add context management and bounded repair attempts.
-
-### Phase 4 — Safe Automated Repair
-- [ ] Implement patch validation and syntax checks.
-- [ ] Compare baseline and post-patch test results.
-- [ ] Add regression-aware retry and rollback behavior.
-- [ ] Create isolated branches and enforce commit criteria.
-- [ ] Test sandbox execution against deliberately faulty repositories.
-
-### Phase 5 — Benchmark and Evaluation
-- [ ] Build the initial Buggy Shop benchmark.
-- [ ] Add independent judging tests and reference patches.
-- [ ] Develop the held-out Buggy Bookings suite.
-- [ ] Compare repair strategies and record reproducible results.
-
-### Phase 6 — Interface and Extensibility
-- [ ] Build a web interface with a live repair timeline.
-- [ ] Add patch previews and test-result summaries.
-- [ ] Test integration with compatible MCP clients.
-- [ ] Explore additional language analyzers and regression-test generation.
-
-## 🚀 Long-Term Vision
-
-RepoMedic aims to evolve into a language-extensible, locally operated code-repair workbench.
-
-Potential future directions include:
-- AST-based analysis for JavaScript, TypeScript, Go, and Java.
-- Automatic regression-test generation for proposed fixes.
-- Pull-request automation through GitHub integration.
-- Training or fine-tuning small models using verified repair trajectories.
-- More extensive evaluation across repositories and unseen bug categories.
-
-These extensions will be prioritized based on benchmark evidence and implementation feasibility.
-
-## 📌 Project Status
-
-**Current stage:** Planned / under development.
-
-The architecture, proposed features, benchmark design, and development roadmap define the intended direction of RepoMedic. Implementation progress and performance results will be documented as the project develops.
-
-**License:** MIT (planned).
-
+## License
+MIT
