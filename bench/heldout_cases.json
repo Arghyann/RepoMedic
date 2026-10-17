@@ -1,0 +1,29 @@
+[
+  {
+    "id": "email-case-duplicates",
+    "repo": "buggy_bookings",
+    "title": "Same email can register twice with different capitalisation",
+    "issue": "Two accounts were created for the same person: one signed up as Alice@Example.com and later someone registered as ' alice@example.COM'. Email addresses must be unique regardless of letter case and surrounding spaces; the second signup should be rejected with EmailTaken.",
+    "target_tests": ["tests/test_users.py::test_email_uniqueness_ignores_case_and_spaces"],
+    "category": "data-integrity",
+    "difficulty": "easy"
+  },
+  {
+    "id": "declined-payment-holds-seats",
+    "repo": "buggy_bookings",
+    "title": "Declined payments still reserve seats",
+    "issue": "When a customer's card is declined, the seats they tried to buy stay reserved and the show starts looking sold out even though nobody paid. A declined payment must not hold any seats and must not create a booking.",
+    "target_tests": ["tests/test_bookings.py::test_declined_payment_does_not_hold_seats"],
+    "category": "consistency",
+    "difficulty": "medium"
+  },
+  {
+    "id": "upcoming-events-date-order",
+    "repo": "buggy_bookings",
+    "title": "Upcoming events list misses and misorders events",
+    "issue": "The upcoming events page is wrong: a show on 5 January 2027 is missing even though it is in the future, and events are not listed soonest-first when they span different months and years.",
+    "target_tests": ["tests/test_events.py::test_upcoming_is_chronological_across_months_and_years"],
+    "category": "logic",
+    "difficulty": "medium"
+  }
+]

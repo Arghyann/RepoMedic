@@ -1,9 +1,12 @@
 .env
 .venv/
 venv/
-__pycache__/
 *.pyc
+.venv/
+venv/
+__pycache__/
 *.egg-info/
 .pytest_cache/
 .scratch/
 reports/
+docs/

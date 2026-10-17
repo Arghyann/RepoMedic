@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "repomedic": {
+      "type": "stdio",
+      "command": "${workspaceFolder}/.venv/Scripts/repomedic-mcp.exe",
+      "args": ["--root", "${workspaceFolder}"]
+    }
+  }
+}
