@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RepoMedic</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0d14;--panel:#111622;--panel2:#161c2b;--line:#232b3d;--text:#e6e9f2;--muted:#8a93a8;
+  --accent:#4f8cff;--accent2:#a35cff;--ok:#2fd27a;--warn:#ffb020;--bad:#ff4d5e;--crit:#ff2e63;
+  --scout:#33c3f0;--diag:#c86bff;--surg:#ffb020;--veri:#2fd27a;--sys:#8a93a8;
+  --mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 Inter,system-ui,sans-serif;min-height:100vh}
+header{display:flex;align-items:center;gap:16px;padding:14px 22px;border-bottom:1px solid var(--line);
+  background:linear-gradient(90deg,rgba(79,140,255,.10),rgba(163,92,255,.08) 60%,transparent)}
+.logo{font-weight:700;font-size:20px;letter-spacing:-.02em}
+.logo span{background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.tag{color:var(--muted);font-size:13px}
+.pills{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.pill{font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--muted)}
+.pill b{color:var(--text);font-weight:600}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;background:var(--muted)}
+.dot.ok{background:var(--ok)} .dot.bad{background:var(--bad)}
+main{display:grid;grid-template-columns:320px minmax(0,1fr) 420px;gap:14px;padding:14px;height:calc(100vh - 62px)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;min-height:0}
+.col{display:flex;flex-direction:column;gap:14px;min-height:0}
+h3{margin:0 0 10px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
+input,textarea,select{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px 10px;font:inherit}
+textarea{min-height:96px;resize:vertical}
+input:focus,textarea:focus{outline:none;border-color:var(--accent)}
+.modes{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:var(--panel2);padding:4px;border-radius:10px;border:1px solid var(--line)}
+.modes button{background:none;border:0;color:var(--muted);padding:7px 0;border-radius:7px;font:600 12px Inter;cursor:pointer}
+.modes button.on{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+.run{margin-top:14px;width:100%;padding:11px;border:0;border-radius:10px;font:700 14px Inter;color:#fff;cursor:pointer;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 6px 24px rgba(79,140,255,.25)}
+.run:disabled{opacity:.55;cursor:wait}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{font-size:11px;padding:4px 8px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);cursor:pointer}
+.chip:hover{color:var(--text);border-color:var(--accent)}
+.check{display:flex;gap:8px;align-items:center;margin-top:10px;font-size:12px;color:var(--muted)}
+.check input{width:auto}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px}
+.stat .v{font:700 20px var(--mono)} .stat .k{font-size:11px;color:var(--muted)}
+.pipeline{display:flex;align-items:center;gap:6px;margin-bottom:12px}
+.node{flex:1;text-align:center;padding:9px 4px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);font-size:12px;font-weight:600;color:var(--muted);transition:.25s}
+.node small{display:block;font-weight:400;font-size:10px;opacity:.8}
+.node.active{color:#fff;transform:translateY(-1px)}
+.node.active[data-a=Scout]{border-color:var(--scout);box-shadow:0 0 0 1px var(--scout),0 0 18px rgba(51,195,240,.35)}
+.node.active[data-a=Diagnostician]{border-color:var(--diag);box-shadow:0 0 0 1px var(--diag),0 0 18px rgba(200,107,255,.35)}
+.node.active[data-a=Surgeon]{border-color:var(--surg);box-shadow:0 0 0 1px var(--surg),0 0 18px rgba(255,176,32,.35)}
+.node.active[data-a=Verifier]{border-color:var(--veri);box-shadow:0 0 0 1px var(--veri),0 0 18px rgba(47,210,122,.35)}
+.node.done{color:var(--text)}
+.arrow{color:var(--line)}
+#feed{overflow:auto;flex:1;display:flex;flex-direction:column;gap:6px;padding-right:4px}
+.ev{display:grid;grid-template-columns:96px 1fr;gap:10px;padding:7px 10px;border-radius:8px;background:var(--panel2);border-left:3px solid var(--sys);animation:in .25s ease}
+@keyframes in{from{opacity:0;transform:translateY(4px)}to{opacity:1}}
+.ev .who{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.ev .body{min-width:0;overflow-wrap:anywhere}
+.ev.thought .body{font-style:italic;color:#cfd5e6}
+.ev.stage{background:none;border-left:0;grid-template-columns:1fr;padding:10px 0 2px;color:var(--muted);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em}
+.ev code,.mono{font-family:var(--mono);font-size:12px}
+.ev .args{color:var(--muted);font-family:var(--mono);font-size:11px}
+.ev.err{border-left-color:var(--bad);color:#ffc2c8}
+.a-Scout{border-left-color:var(--scout)} .a-Scout .who{color:var(--scout)}
+.a-Diagnostician{border-left-color:var(--diag)} .a-Diagnostician .who{color:var(--diag)}
+.a-Surgeon{border-left-color:var(--surg)} .a-Surgeon .who{color:var(--surg)}
+.a-Verifier{border-left-color:var(--veri)} .a-Verifier .who{color:var(--veri)}
+.a-System .who{color:var(--sys)}
+.tabs{display:flex;gap:4px;margin-bottom:12px}
+.tabs button{flex:1;background:var(--panel2);border:1px solid var(--line);color:var(--muted);padding:7px;border-radius:8px;font:600 12px Inter;cursor:pointer}
+.tabs button.on{color:var(--text);border-color:var(--accent)}
+.tabs button .n{font-family:var(--mono);margin-left:4px;color:var(--accent)}
+.pane{display:none;overflow:auto;flex:1;min-height:0} .pane.on{display:block}
+.score{display:flex;align-items:center;gap:16px;margin-bottom:12px}
+.ring{--p:0;--c:var(--muted);width:96px;height:96px;border-radius:50%;display:grid;place-items:center;
+  background:conic-gradient(var(--c) calc(var(--p)*1%),var(--line) 0)}
+.ring div{width:76px;height:76px;border-radius:50%;background:var(--panel);display:grid;place-items:center;font:700 26px var(--mono)}
+.sev{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;flex:1}
+.sev div{background:var(--panel2);border-radius:8px;padding:6px;text-align:center;font:700 16px var(--mono)}
+.sev small{display:block;font:500 10px Inter;color:var(--muted);text-transform:uppercase}
+.f{padding:8px 10px;border-radius:8px;background:var(--panel2);margin-bottom:6px;border-left:3px solid var(--muted)}
+.f .t{font-weight:600;font-size:13px} .f .l{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.f .m{font-size:12px;color:#c3c9d8;margin-top:3px}
+.s-critical{border-left-color:var(--crit)} .s-high{border-left-color:var(--bad)} .s-medium{border-left-color:var(--warn)} .s-low{border-left-color:var(--accent)}
+.badge{font:700 10px Inter;padding:2px 6px;border-radius:5px;text-transform:uppercase;margin-right:6px;background:var(--line)}
+.b-critical{background:var(--crit);color:#fff}.b-high{background:var(--bad);color:#fff}.b-medium{background:var(--warn);color:#111}.b-low{background:var(--accent);color:#fff}
+.b-fp{background:#2a3246;color:var(--muted)} .b-ai{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+pre.diff{margin:0 0 10px;padding:10px;background:#0d111b;border:1px solid var(--line);border-radius:8px;overflow:auto;font:12px/1.45 var(--mono)}
+.add{color:#5ff29a;background:rgba(47,210,122,.08);display:block}.del{color:#ff7d8a;background:rgba(255,77,94,.08);display:block}.hunk{color:var(--accent);display:block}
+.tests{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.tbadge{font:600 12px var(--mono);padding:5px 9px;border-radius:7px;background:var(--panel2);border:1px solid var(--line)}
+.tbadge.ok{border-color:var(--ok);color:var(--ok)} .tbadge.bad{border-color:var(--bad);color:var(--bad)}
+.banner{padding:12px;border-radius:10px;margin-bottom:10px;font-weight:600}
+.banner.ok{background:rgba(47,210,122,.12);border:1px solid var(--ok)} .banner.bad{background:rgba(255,77,94,.1);border:1px solid var(--bad)}
+table{width:100%;border-collapse:collapse;font-size:12px} th,td{text-align:left;padding:6px;border-bottom:1px solid var(--line)} th{color:var(--muted);font-weight:600}
+.empty{color:var(--muted);font-size:13px;text-align:center;padding:30px 10px}
+.big{font:700 34px var(--mono);background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+@media (max-width:1200px){main{grid-template-columns:1fr;height:auto}#feed{max-height:60vh}.pane{max-height:70vh}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">🩺 <span>RepoMedic</span></div>
+  <div class="tag">Local-first AI code doctor · Gemma via Ollama · tools over MCP</div>
+  <div class="pills">
+    <div class="pill" id="pOllama"><span class="dot"></span>Ollama</div>
+    <div class="pill">Model <b id="pModel">…</b></div>
+    <div class="pill">🔒 Code never leaves this machine</div>
+  </div>
+</header>
+<main>
+  <section class="col">
+    <div class="card">
+      <h3>Patient</h3>
+      <div class="modes" id="modes">
+        <button data-m="scan" class="on">Scan</button><button data-m="diagnose">Diagnose</button>
+        <button data-m="fix">Fix</button><button data-m="bench">Bench</button>
+      </div>
+      <div id="repoBox"><label>Repository path</label><input id="repo" spellcheck="false"></div>
+      <div id="suiteBox" style="display:none"><label>Benchmark suite</label>
+        <select id="suite"><option value="main">Main: buggy_shop (7 bugs)</option>
+          <option value="heldout">Held-out: buggy_bookings (3 never-seen bugs)</option>
+          <option value="all">All 10 bugs</option></select></div>
+      <div id="issueBox" style="display:none">
+        <label>Issue / bug report</label>
+        <textarea id="issue" placeholder="Paste a GitHub issue…"></textarea>
+        <div class="chips" id="chips"></div>
+        <label class="check"><input type="checkbox" id="sandbox" checked> Work on a disposable copy</label>
+      </div>
+      <label>Model</label><input id="model" list="models" spellcheck="false"><datalist id="models"></datalist>
+      <label>Tool calling</label>
+      <select id="toolMode"><option value="auto">Gemma native function calling (auto-fallback)</option><option value="json">Grammar-constrained JSON (any model)</option></select>
+      <button class="run" id="run">Run scan</button>
+    </div>
+    <div class="card">
+      <h3>Session</h3>
+      <div class="stats">
+        <div class="stat"><div class="v" id="sTime">0.0s</div><div class="k">elapsed</div></div>
+        <div class="stat"><div class="v" id="sTools">0</div><div class="k">MCP tool calls</div></div>
+        <div class="stat"><div class="v" id="sLlm">0</div><div class="k">LLM calls</div></div>
+        <div class="stat"><div class="v" id="sTps">–</div><div class="k">tokens / sec</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card col" style="gap:0">
+    <div class="pipeline">
+      <div class="node" data-a="Scout">Scout<small>map + static scan</small></div><span class="arrow">→</span>
+      <div class="node" data-a="Diagnostician">Diagnostician<small>Gemma · investigate</small></div><span class="arrow">→</span>
+      <div class="node" data-a="Surgeon">Surgeon<small>Gemma · patch</small></div><span class="arrow">→</span>
+      <div class="node" data-a="Verifier">Verifier<small>tests · git</small></div>
+    </div>
+    <h3>Agent timeline</h3>
+    <div id="feed"><div class="empty">Pick a mode and press Run. Every thought, MCP tool call, patch and test run streams here live.</div></div>
+  </section>
+
+  <section class="card col" style="gap:0">
+    <div class="tabs" id="tabs">
+      <button data-t="health" class="on">Health</button>
+      <button data-t="issues">Issues<span class="n" id="nIssues"></span></button>
+      <button data-t="patch">Patch</button>
+      <button data-t="bench">Bench</button>
+    </div>
+    <div class="pane on" id="t-health"><div class="empty">Run a scan to see the repository's health.</div></div>
+    <div class="pane" id="t-issues"><div class="empty">Diagnose to get Gemma-reviewed issues.</div></div>
+    <div class="pane" id="t-patch"><div class="empty">Fix an issue to see the verified patch.</div></div>
+    <div class="pane" id="t-bench"><div class="empty">Run RepoMedic-Bench: real backend bugs, judged by ground-truth tests.</div></div>
+  </section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let mode = "scan", es = null, t0 = 0, timer = null, toolCalls = 0, llmCalls = 0, issues = [], benchRows = [];
+
+function setMode(m){
+  mode = m;
+  document.querySelectorAll("#modes button").forEach(b => b.classList.toggle("on", b.dataset.m === m));
+  $("#issueBox").style.display = m === "fix" ? "" : "none";
+  $("#repoBox").style.display = m === "bench" ? "none" : "";
+  $("#suiteBox").style.display = m === "bench" ? "" : "none";
+  $("#run").textContent = {scan:"Run scan", diagnose:"Run AI diagnosis", fix:"Fix & verify", bench:"Run benchmark"}[m];
+}
+document.querySelectorAll("#modes button").forEach(b => b.onclick = () => setMode(b.dataset.m));
+function showTab(t){
+  document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.t === t));
+  document.querySelectorAll(".pane").forEach(p => p.classList.toggle("on", p.id === "t-" + t));
+}
+document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => showTab(b.dataset.t));
+
+async function init(){
+  const c = await (await fetch("/api/config")).json();
+  $("#repo").value = c.bench_repo; $("#model").value = c.model; $("#pModel").textContent = c.model;
+  $("#toolMode").value = c.tool_mode === "json" ? "json" : "auto";
+  $("#models").innerHTML = c.models.map(m => `<option value="${esc(m)}">`).join("");
+  const ok = c.ollama === "ok";
+  $("#pOllama").innerHTML = `<span class="dot ${ok ? "ok" : "bad"}"></span>Ollama ${ok ? "connected" : "offline"}`;
+  $("#pOllama").title = ok ? c.ollama_host : c.ollama;
+  $("#chips").innerHTML = c.cases.map((x, i) => `<span class="chip" data-i="${i}">${esc(x.title)}</span>`).join("");
+  document.querySelectorAll(".chip").forEach(ch => ch.onclick = () => { $("#issue").value = c.cases[ch.dataset.i].issue; });
+}
+
+function feed(html, cls, agent){
+  const f = $("#feed"); if (f.querySelector(".empty")) f.innerHTML = "";
+  const d = document.createElement("div"); d.className = `ev ${cls} a-${agent || "System"}`;
+  d.innerHTML = cls === "stage" ? html : `<div class="who">${esc(agent || "System")}</div><div class="body">${html}</div>`;
+  f.appendChild(d); f.scrollTop = f.scrollHeight;
+}
+function activate(agent){
+  document.querySelectorAll(".node").forEach(n => {
+    if (n.classList.contains("active") && n.dataset.a !== agent) n.classList.add("done");
+    n.classList.toggle("active", n.dataset.a === agent);
+  });
+}
+function diffHtml(d){
+  return esc(d).split("\n").map(l => l.startsWith("+") && !l.startsWith("+++") ? `<span class="add">${l}</span>`
+    : l.startsWith("-") && !l.startsWith("---") ? `<span class="del">${l}</span>`
+    : l.startsWith("@@") ? `<span class="hunk">${l}</span>` : l).join("\n");
+}
+
+function renderHealth(ev){
+  const counts = {critical:0, high:0, medium:0, low:0}; ev.findings.forEach(f => counts[f.severity]++);
+  const col = ev.score >= 80 ? "var(--ok)" : ev.score >= 50 ? "var(--warn)" : "var(--bad)";
+  const a = ev.architecture;
+  $("#t-health").innerHTML = `
+    <div class="score"><div class="ring" style="--p:${ev.score};--c:${col}"><div>${ev.score}</div></div>
+      <div class="sev">${Object.entries(counts).map(([k,v]) => `<div>${v}<small>${k}</small></div>`).join("")}</div></div>
+    <h3>Architecture · ${a.modules} modules</h3>
+    ${a.cycles.map(c => `<div class="f s-medium"><div class="t">⟳ Circular import</div><div class="l">${esc([...c, c[0]].join(" → "))}</div></div>`).join("") || '<div class="f s-low"><div class="t">No circular imports</div></div>'}
+    ${a.layer_violations.map(v => `<div class="f s-medium"><div class="t">Layering violation</div><div class="l">${esc(v.from)} → ${esc(v.to)}</div></div>`).join("")}
+    <h3 style="margin-top:14px">Findings</h3>
+    ${ev.findings.map(f => `<div class="f s-${f.severity}"><div class="t"><span class="badge b-${f.severity}">${f.severity}</span>${esc(f.title)}</div>
+      <div class="l">${esc(f.rule)} · ${esc(f.file)}:${f.line}</div><div class="m">${esc(f.message)}</div></div>`).join("")}`;
+}
+function renderIssues(){
+  $("#nIssues").textContent = issues.length || "";
+  $("#t-issues").innerHTML = issues.map(i => `<div class="f s-${esc(i.severity)}">
+    <div class="t">${i.verdict === "false_positive" ? '<span class="badge b-fp">dismissed</span>' : `<span class="badge b-${esc(i.severity)}">${esc(i.severity)}</span>`}
+      ${i.source === "gemma-hunt" ? '<span class="badge b-ai">Gemma found</span>' : ""}${esc(i.title)}</div>
+    <div class="l">${esc(i.file)}:${esc(i.line)}</div><div class="m">${esc(i.explanation)}</div>
+    ${i.fix ? `<div class="m"><b>Fix:</b> ${esc(i.fix)}</div>` : ""}</div>`).join("") || '<div class="empty">No issues reported.</div>';
+}
+function renderBench(summary){
+  const rows = benchRows.map(r => `<tr><td>${r.resolved ? "✅" : "❌"}</td><td class="mono">${esc(r.id)}</td><td>${esc(r.category)}</td>
+    <td class="mono">${r.attempts}</td><td class="mono">${r.seconds}s</td></tr>`).join("");
+  const solved = benchRows.filter(r => r.resolved).length;
+  $("#t-bench").innerHTML = `<div class="score"><div class="big">${solved}/${benchRows.length}</div>
+    <div style="color:var(--muted)">resolved (judged by ground-truth tests)${summary ? `<br>resolve rate <b>${summary.resolve_rate}%</b> · false claims ${summary.false_claims} · avg ${summary.avg_seconds}s` : ""}</div></div>
+    <table><tr><th></th><th>case</th><th>category</th><th>tries</th><th>time</th></tr>${rows}</table>`;
+}
+
+function handle(ev){
+  const agent = ev.agent || "System";
+  switch (ev.type) {
+    case "stage": activate(agent); feed(`<span style="color:var(--${{Scout:"scout",Diagnostician:"diag",Surgeon:"surg",Verifier:"veri"}[agent]||"sys"})">${esc(agent)}</span> · ${esc(ev.title)}`, "stage"); break;
+    case "thought": feed(esc(ev.text), "thought", agent); break;
+    case "tool_call": toolCalls++; $("#sTools").textContent = toolCalls;
+      feed(`🔧 <code>${esc(ev.tool)}</code> <span class="args">${esc(JSON.stringify(ev.args)).slice(0, 220)}</span>`, "", agent); break;
+    case "tool_result": if (!ev.ok) feed(`✗ ${esc(ev.preview.slice(0, 300))}`, "err", agent); break;
+    case "log": feed(esc(ev.message), ev.level === "warn" ? "err" : "", agent); break;
+    case "findings": renderHealth(ev); feed(`Static scan: <b>${ev.findings.length}</b> findings · health <b>${ev.score}/100</b>`, "", "Scout"); break;
+    case "tests": feed(`🧪 <b>${esc(ev.label)}</b>: <span style="color:var(--${ev.ok ? "ok" : "bad"})">${esc(ev.summary)}</span>`, "", "Verifier"); break;
+    case "issue": issues.push(ev); renderIssues(); feed(`● <b>${esc(ev.title)}</b> <span class="args">${esc(ev.file)}:${esc(ev.line)} · ${esc(ev.verdict)}</span>`, "", agent); break;
+    case "diagnosis": feed(`🎯 Root cause in <code>${esc(ev.file)}</code> ${esc(ev.symbol || "")}<br>${esc(ev.root_cause)}`, "", "Diagnostician"); break;
+    case "patch": feed(`🩹 Patch attempt ${ev.attempt} → ${ev.files.map(esc).join(", ")}`, "", "Surgeon");
+      $("#t-patch").innerHTML = `<h3>Attempt ${ev.attempt}</h3><pre class="diff">${diffHtml(ev.diff)}</pre>`; showTab("patch"); break;
+    case "bench_case": benchRows.push(ev); renderBench(); showTab("bench");
+      feed(`${ev.resolved ? "✅" : "❌"} <b>${esc(ev.id)}</b> in ${ev.seconds}s`, "", "Verifier"); break;
+    case "bench_done": renderBench(ev); feed(`🏁 RepoMedic-Bench: <b>${ev.resolved}/${ev.total}</b> resolved (${ev.resolve_rate}%)`, "", "System"); break;
+    case "result": onResult(ev); break;
+    case "error": feed(esc(ev.message), "err", "System"); break;
+  }
+}
+function onResult(r){
+  const llm = r.llm || {}; llmCalls = llm.calls || 0; $("#sLlm").textContent = llmCalls;
+  if (llm.tokens_per_second) $("#sTps").textContent = llm.tokens_per_second;
+  if (r.mode === "fix") {
+    const head = r.success
+      ? `<div class="banner ok">✔ Fixed &amp; verified in ${r.attempts} attempt(s) · committed on <code>${esc(r.branch)}</code></div>`
+      : `<div class="banner bad">✘ ${esc(r.error)}</div>`;
+    const tests = (r.fixed_tests || []).map(t => `<span class="tbadge ok">✓ ${esc(t.split("::").pop())}</span>`).join("");
+    $("#t-patch").innerHTML = head + (tests ? `<h3>Tests now passing</h3><div class="tests">${tests}</div>` : "")
+      + (r.explanation ? `<p>${esc(r.explanation)}</p>` : "") + (r.diff ? `<pre class="diff">${diffHtml(r.diff)}</pre>` : "")
+      + (r.commit ? `<div class="l mono">${esc(r.commit)}</div>` : "");
+    showTab("patch");
+  }
+  if (r.mode === "diagnose") { renderIssues(); if (issues.length) showTab("issues"); feed(`📄 Report written to <code>${esc(r.report)}</code>`, "", "System"); }
+  feed(`Done in ${r.seconds}s · ${r.tool_calls} MCP tool calls${llmCalls ? ` · ${llmCalls} LLM calls` : ""}`, "", "System");
+}
+
+$("#run").onclick = () => {
+  if (es) es.close();
+  toolCalls = 0; llmCalls = 0; issues = []; benchRows = [];
+  $("#feed").innerHTML = ""; $("#sTools").textContent = "0"; $("#sLlm").textContent = "0"; $("#sTps").textContent = "–";
+  document.querySelectorAll(".node").forEach(n => n.classList.remove("active", "done"));
+  const p = new URLSearchParams({model: $("#model").value, tool_mode: $("#toolMode").value});
+  let url;
+  if (mode === "bench") { p.set("suite", $("#suite").value); url = "/api/bench?" + p; }
+  else { p.set("mode", mode); p.set("repo", $("#repo").value); p.set("issue", $("#issue").value); p.set("sandbox", $("#sandbox").checked ? 1 : 0); url = "/api/run?" + p; }
+  $("#run").disabled = true; t0 = Date.now();
+  timer = setInterval(() => $("#sTime").textContent = ((Date.now() - t0) / 1000).toFixed(1) + "s", 100);
+  es = new EventSource(url);
+  es.onmessage = e => handle(JSON.parse(e.data));
+  const stop = () => { es.close(); clearInterval(timer); $("#run").disabled = false; activate(null); };
+  es.addEventListener("end", stop);
+  es.onerror = () => { feed("Connection closed.", "err"); stop(); };
+};
+init();
+</script>
+</body>
+</html>
