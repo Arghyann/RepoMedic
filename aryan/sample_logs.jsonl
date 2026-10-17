@@ -1,0 +1,10 @@
+{"host":"192.168.1.10","datetime":"17/Oct/2026:15:40:01 +0000","method":"GET","request":"/api/v1/health","status":200,"bytes":128}
+{"host":"192.168.1.11","datetime":"17/Oct/2026:15:40:02 +0000","method":"GET","request":"/api/v1/products","status":200,"bytes":4096}
+{"host":"192.168.1.12","datetime":"17/Oct/2026:15:40:03 +0000","method":"POST","request":"/api/v1/checkout","status":503,"bytes":512,"message":"Database connection pool exhausted: active 50/50"}
+{"host":"192.168.1.13","datetime":"17/Oct/2026:15:40:04 +0000","method":"POST","request":"/api/v1/checkout","status":503,"bytes":512,"message":"Database connection pool exhausted: active 50/50"}
+{"host":"192.168.1.14","datetime":"17/Oct/2026:15:40:05 +0000","method":"POST","request":"/api/v1/checkout","status":503,"bytes":512,"message":"Database connection pool exhausted: active 50/50"}
+{"host":"192.168.1.15","datetime":"17/Oct/2026:15:40:06 +0000","method":"GET","request":"/api/v1/products","status":200,"bytes":4096}
+{"host":"192.168.1.16","datetime":"17/Oct/2026:15:40:07 +0000","method":"POST","request":"/auth/login","status":429,"bytes":256,"message":"Rate limit exceeded: 100 req/min for IP"}
+{"host":"192.168.1.17","datetime":"17/Oct/2026:15:40:08 +0000","method":"POST","request":"/api/v1/checkout","status":503,"bytes":512,"message":"Database connection pool exhausted: active 50/50"}
+{"host":"192.168.1.18","datetime":"17/Oct/2026:15:40:09 +0000","method":"GET","request":"/api/v1/user/profile","status":200,"bytes":1024}
+{"host":"192.168.1.19","datetime":"17/Oct/2026:15:40:10 +0000","method":"POST","request":"/api/v1/checkout","status":500,"bytes":1024,"message":"Unhandled error: failed to acquire lock on inventory table"}
